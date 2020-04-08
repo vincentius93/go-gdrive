@@ -11,7 +11,7 @@ type spreadSheet struct {
 }
 type SpreadSheetInterface interface {
 	CreateNewSheet(FileTitle string)(*sheets.Spreadsheet,error)
-	WriteDataRaw(SpreadSheetId string,Range string, value []interface{})(error)
+	WriteDataRaw(SpreadSheetId string,Range string, value [][]interface{})(error)
 	UpdateCellStyle(SpreadSheetId string, cellStyle []sheets.Request)(error)
 }
 
@@ -26,9 +26,9 @@ func (s *spreadSheet)CreateNewSheet(FileTitle string)(*sheets.Spreadsheet,error)
 	return spreadSheet,err
 }
 
-func (s *spreadSheet)WriteDataRaw(SpreadSheetId string,Range string, value []interface{})(error){
+func (s *spreadSheet)WriteDataRaw(SpreadSheetId string,Range string, value [][]interface{})(error){
 	var valueRange sheets.ValueRange
-	valueRange.Values = append(valueRange.Values, value)
+	valueRange.Values = value
 
 	_,err := s.spreadSheetService.Spreadsheets.Values.Update(SpreadSheetId, Range, &valueRange).ValueInputOption("RAW").Do()
 	if err != nil {
