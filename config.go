@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
-	"google.golang.org/api/drive/v3"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/drive/v3"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -30,7 +30,7 @@ type googleApi struct {
 	client *http.Client
 }
 
-func Conenction(CredentialsPath string)(googleApiInterface, error){
+func Conenction(CredentialsPath string,TokenPath string)(googleApiInterface, error){
 	credentials, err := ioutil.ReadFile(CredentialsPath)
 	if err != nil {
 		err = errors.New(fmt.Sprintf("Unable to read credentials json file. Err: %v\n", err))
@@ -39,12 +39,18 @@ func Conenction(CredentialsPath string)(googleApiInterface, error){
 	// If modifying these scopes, delete your previously saved token.json.
 	config, err := google.ConfigFromJSON(credentials, drive.DriveFileScope)
 
-	tokFile := "token.json"
-	tok, err := tokenFromFile(tokFile)
+	//tokFile := "token.json"
+	tok, err := tokenFromFile(TokenPath)
+	//if err != nil {
+	//	tok = getTokenFromWeb(config)
+	//	saveToken(TokenPath, tok)
+	//}
+	NewToken,err := refreshToken(config,tok)
 	if err != nil {
-		tok = getTokenFromWeb(config)
-		saveToken(tokFile, tok)
+		fmt.Println(err)
+		return nil,err
 	}
+	saveToken(TokenPath,NewToken)
 	gdrive := googleApi{
 		client:config.Client(context.Background(), tok),
 	}
@@ -84,3 +90,11 @@ func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 	return tok
 }
 
+func refreshToken(config *oauth2.Config,OldToken *oauth2.Token)(NewToken *oauth2.Token,err error){
+	tokenSource := config.TokenSource(oauth2.NoContext,OldToken)
+	NewToken,err = tokenSource.Token()
+	if err != nil {
+		return nil, err
+	}
+	return
+}
