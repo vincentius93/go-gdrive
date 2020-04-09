@@ -14,23 +14,26 @@ import (
 	"os"
 )
 
-
 const (
-	GOOGLE_DIRECTORY  = "application/vnd.google-apps.folder"
-	GOOGLE_SPREAD_SHEET = "application/vnd.google-apps.spreadsheet"
-	GOOGLE_DOCS = "application/vnd.google-apps.document"
+	GOOGLE_DIRECTORY             = "application/vnd.google-apps.folder"
+	GOOGLE_SPREAD_SHEET          = "application/vnd.google-apps.spreadsheet"
+	GOOGLE_DOCS                  = "application/vnd.google-apps.document"
 	GOOGLE_DIRECTORY_Q_MIME_TYPE = "mimeType='application/vnd.google-apps.folder' and trashed=false"
 )
 
 type googleApiInterface interface {
-	GetDriveServices()(gdriveInterface,error)
-	GetSpreadSheetServices()(SpreadSheetInterface,error)
+	GetDriveServices() (gdriveInterface, error)
+	GetSpreadSheetServices() (SpreadSheetInterface, error)
+	RefreshToken()(NewToken *oauth2.Token,err error)
 }
 type googleApi struct {
-	client *http.Client
+	client    *http.Client
+	config    *oauth2.Config
+	tokenPath string
+	userToken *oauth2.Token
 }
 
-func Conenction(CredentialsPath string,TokenPath string)(googleApiInterface, error){
+func Conenction(CredentialsPath string, TokenPath string) (googleApiInterface, error) {
 	credentials, err := ioutil.ReadFile(CredentialsPath)
 	if err != nil {
 		err = errors.New(fmt.Sprintf("Unable to read credentials json file. Err: %v\n", err))
@@ -39,22 +42,19 @@ func Conenction(CredentialsPath string,TokenPath string)(googleApiInterface, err
 	// If modifying these scopes, delete your previously saved token.json.
 	config, err := google.ConfigFromJSON(credentials, drive.DriveFileScope)
 
-	//tokFile := "token.json"
-	tok, err := tokenFromFile(TokenPath)
-	//if err != nil {
-	//	tok = getTokenFromWeb(config)
-	//	saveToken(TokenPath, tok)
-	//}
-	NewToken,err := refreshToken(config,tok)
+	// this function will run for the first time when you dont have token file
+	Token, err := tokenFromFile(TokenPath)
 	if err != nil {
-		fmt.Println(err)
-		return nil,err
+		Token = getTokenFromWeb(config)
+		saveToken(TokenPath, Token)
 	}
-	saveToken(TokenPath,NewToken)
 	gdrive := googleApi{
-		client:config.Client(context.Background(), tok),
+		client: config.Client(context.Background(), Token),
+		config:config,
+		tokenPath:TokenPath,
+		userToken:Token,
 	}
-	return &gdrive,err
+	return &gdrive, err
 }
 
 func tokenFromFile(file string) (*oauth2.Token, error) {
@@ -90,11 +90,12 @@ func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 	return tok
 }
 
-func refreshToken(config *oauth2.Config,OldToken *oauth2.Token)(NewToken *oauth2.Token,err error){
-	tokenSource := config.TokenSource(oauth2.NoContext,OldToken)
-	NewToken,err = tokenSource.Token()
+func (g googleApi)RefreshToken()(NewToken *oauth2.Token,err error){
+	tokenSource := g.config.TokenSource(oauth2.NoContext, g.userToken)
+	NewToken, err = tokenSource.Token()
 	if err != nil {
 		return nil, err
 	}
-	return
+	saveToken(g.tokenPath,NewToken)
+	return NewToken,err
 }
